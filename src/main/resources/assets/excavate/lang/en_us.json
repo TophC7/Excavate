@@ -1,0 +1,5 @@
+{
+  "enchantment.excavate.excavation": "Excavation",
+  "enchantment.excavate.excavation.desc.1": "Mine a 3x3 area. Crouch to mine single blocks. Excavation only affects blocks the tool can mine.",
+  "enchantment.excavate.excavation.desc.2": "Mine a 5x5 area. Crouch to mine single blocks. Excavation only affects blocks the tool can mine."
+}
