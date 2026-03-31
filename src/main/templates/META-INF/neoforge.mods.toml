@@ -6,6 +6,7 @@ license = "${mod_license}"
 modId = "${mod_id}"
 version = "${mod_version}"
 displayName = "${mod_name}"
+logoFile = "icon.png"
 description = '''
 Adds the Excavation enchantment: mine in a 3x3 (level I) or 5x5 (level II) area.
 Works on all tools; pickaxes, axes, shovels, and hoes.
