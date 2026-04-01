@@ -15,12 +15,14 @@ dist/
 
 # IDEs
 .idea/
-.vscode/
 *.swp
 *.swo
 *~
 .DS_Store
 
+# Nix
+.direnv/
+
 # Project specific
-references/
+run/
 .claude/
