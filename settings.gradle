@@ -9,3 +9,6 @@ plugins {
 }
 
 rootProject.name = 'excavate'
+
+// Composite build: resolve KwahsCore from source (no publishToMavenLocal needed)
+includeBuild('../KwahsCore')
