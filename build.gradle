@@ -10,6 +10,19 @@ group = mod_group_id
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
+// KwahsCore: compiled as part of this mod's source set so its classes
+// are in the same NeoForge module. The jarJar dependency is kept for
+// distribution builds, but dev runs use the source directly.
+sourceSets.main.java.srcDir "${kwahscore_path}/src/main/java"
+
+repositories {
+    mavenLocal()
+}
+
+dependencies {
+    jarJar('xyz.kwahson.core:kwahs_core:0.1.0')
+}
+
 neoForge {
     version = project.neo_version
 

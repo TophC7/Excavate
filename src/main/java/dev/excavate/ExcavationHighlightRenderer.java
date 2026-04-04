@@ -11,6 +11,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -26,22 +27,25 @@ public class ExcavationHighlightRenderer {
     public static void onRenderHighlight(RenderHighlightEvent.Block event) {
         Minecraft mc = Minecraft.getInstance();
         Player player = mc.player;
-        if (player == null) return;
+        if (player == null || mc.level == null) return;
 
         if (player.isCrouching()) return;
 
-        int level = ExcavateMod.getExcavationLevel(player.level(), player);
-        if (level <= 0) return;
+        int enchantLevel = ExcavateMod.getExcavationLevel(player.level(), player);
+        if (enchantLevel <= 0) return;
 
-        // only show the area highlight if the tool can mine the targeted block
         BlockPos origin = event.getTarget().getBlockPos();
         BlockState targetState = mc.level.getBlockState(origin);
         ItemStack tool = player.getMainHandItem();
-        if (!tool.isCorrectToolForDrops(targetState)) return;
         Direction face = event.getTarget().getDirection();
-        int radius = level;
 
-        AABB area = buildAreaBox(origin, face.getAxis(), radius);
+        boolean isCrop = targetState.getBlock() instanceof CropBlock crop && crop.isMaxAge(targetState);
+
+        if (!isCrop && !tool.isCorrectToolForDrops(targetState)) return;
+
+        // crops expand horizontally (Y axis = flat XZ plane), mining uses the clicked face
+        Direction.Axis axis = isCrop ? Direction.Axis.Y : face.getAxis();
+        AABB area = buildAreaBox(origin, axis, enchantLevel);
 
         Camera camera = event.getCamera();
         Vec3 cam = camera.getPosition();
