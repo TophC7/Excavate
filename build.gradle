@@ -72,8 +72,8 @@ neoForge.ideSyncTask generateModMetadata
 
 dependencies {
     // Embed KwahsCore via JarJar for production (dedup-safe when multiple mods are installed)
-    jarJar("xyz.kwahson.core:kwahs_core:[0.1.0,1.0.0)") {
-        version { prefer '0.1.0' }
+    jarJar("xyz.kwahson.core:kwahs_core:[0.2.0,1.0.0)") {
+        version { prefer '0.2.0' }
     }
 }
 
