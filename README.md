@@ -2,6 +2,8 @@
 
 Area mining enchantment for NeoForge 1.21.1.
 
+![Mod preview, Excavation II](public/preview.webp)
+
 **Excavation I** mines a 3x3 area.
 **Excavation II** mines a 5x5 area.
 Crouch to mine single blocks.
@@ -25,9 +27,9 @@ If no seed drops, that crop is left empty. You can toggle auto-replant in the co
 
 Open the config screen from the Mods menu. Settings:
 
-| Setting | Default | Description |
-|---|---|---|
-| Auto-Replant | On | Replant crops automatically when area-harvesting |
+| Setting      | Default | Description                                      |
+| ------------ | ------- | ------------------------------------------------ |
+| Auto-Replant | On      | Replant crops automatically when area-harvesting |
 
 ## Getting the enchantment
 
