@@ -12,17 +12,19 @@ Adds the Excavation enchantment: mine in a 3x3 (level I) or 5x5 (level II) area.
 Works on all tools; pickaxes, axes, shovels, and hoes.
 Each block drops its own correct loot.
 '''
+author = "Kwahson"
+displayURL = "https://github.com/tophc7/Excavate"
 
-[[dependencies.${mod_id}]]
-    modId="neoforge"
-    type="required"
-    versionRange="[21.1.219,)"
-    ordering="NONE"
-    side="BOTH"
+[[dependencies."${mod_id}"]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.1.219,)"
+ordering = "NONE"
+side = "BOTH"
 
-[[dependencies.${mod_id}]]
-    modId="minecraft"
-    type="required"
-    versionRange="${minecraft_version_range}"
-    ordering="NONE"
-    side="BOTH"
+[[dependencies."${mod_id}"]]
+modId = "minecraft"
+type = "required"
+versionRange = "${minecraft_version_range}"
+ordering = "NONE"
+side = "BOTH"
