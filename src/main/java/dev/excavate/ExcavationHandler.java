@@ -22,30 +22,36 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import xyz.kwahson.core.config.SafeConfig;
 
 @EventBusSubscriber(modid = ExcavateMod.MOD_ID)
 public class ExcavationHandler {
 
-    // tracks which block face the player clicked so we know what plane to expand
+    // Both maps are only accessed from the server main thread
+    // (LeftClickBlock, BreakEvent, ServerTick, PlayerLoggedOut all fire there).
     private static final HashMap<UUID, Direction> clickedFace = new HashMap<>();
-
-    // per-player recursion guard so simultaneous players don't block each other
     private static final Set<UUID> excavatingPlayers = new HashSet<>();
 
     private static boolean configValidated = false;
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        // validateOrReset detects corruption via sentinel reads, but its file cleanup
-        // currently targets -client.toml; this mod uses COMMON (-common.toml).
-        // Sentinel protection still works, SafeConfig wrappers handle the rest.
         if (!configValidated && ExcavateConfig.SPEC.isLoaded()) {
             configValidated = true;
             SafeConfig.validateOrReset(ExcavateMod.MOD_ID, ExcavateConfig.SPEC,
-                    ExcavateConfig.AUTO_REPLANT);
+                    "common", ExcavateConfig.AUTO_REPLANT, ExcavateConfig.SHOW_HIGHLIGHT);
         }
+    }
+
+    // reset so config is re-validated on next server start within the same JVM
+    // (singleplayer: quit world -> new world without restarting)
+    @SubscribeEvent
+    public static void onServerStopped(ServerStoppedEvent event) {
+        configValidated = false;
+        clickedFace.clear();
+        excavatingPlayers.clear();
     }
 
     @SubscribeEvent
@@ -120,15 +126,10 @@ public class ExcavationHandler {
                 if (a == 0 && b == 0) continue;
 
                 BlockPos target = offsetFromFace(origin, faceAxis, a, b);
+
+                if (!canAreaBreak(level, target, tool)) continue;
+
                 BlockState state = level.getBlockState(target);
-
-                if (state.isAir()) continue;
-
-                float hardness = state.getDestroySpeed(level, target);
-                if (hardness < 0) continue;
-
-                if (!tool.isCorrectToolForDrops(state)) continue;
-
                 Block.dropResources(state, level, target, level.getBlockEntity(target), player, tool);
                 level.destroyBlock(target, false);
 
@@ -157,19 +158,21 @@ public class ExcavationHandler {
         for (int dx = -enchantLevel; dx <= enchantLevel; dx++) {
             for (int dz = -enchantLevel; dz <= enchantLevel; dz++) {
                 BlockPos target = origin.offset(dx, 0, dz);
-                BlockState state = level.getBlockState(target);
 
-                if (!(state.getBlock() instanceof CropBlock crop)) continue;
-                if (!crop.isMaxAge(state)) continue;
+                if (!canAreaHarvest(level, target)) continue;
+
+                BlockState state = level.getBlockState(target);
+                CropBlock crop = (CropBlock) state.getBlock();
 
                 // collect drops and seed type before destroying the block
-                Item seedType = crop.getCloneItemStack(level, target, state).getItem();
+                ItemStack seedStack = crop.getCloneItemStack(level, target, state);
                 List<ItemStack> drops = Block.getDrops(state, level, target,
                         level.getBlockEntity(target), player, tool);
                 level.destroyBlock(target, false);
 
                 // replant by consuming one seed from the drops
-                if (replant) {
+                if (replant && !seedStack.isEmpty()) {
+                    Item seedType = seedStack.getItem();
                     boolean seeded = false;
                     for (ItemStack drop : drops) {
                         if (drop.is(seedType)) {
@@ -197,6 +200,26 @@ public class ExcavationHandler {
                 if (tool.isEmpty()) return;
             }
         }
+    }
+
+    /**
+     * Whether a block at the given position would be area-mined.
+     * Used by both the server handler and client highlight renderer.
+     */
+    static boolean canAreaBreak(Level level, BlockPos target, ItemStack tool) {
+        BlockState state = level.getBlockState(target);
+        if (state.isAir()) return false;
+        if (state.getDestroySpeed(level, target) < 0) return false;
+        return tool.isCorrectToolForDrops(state);
+    }
+
+    /**
+     * Whether a crop at the given position would be area-harvested.
+     * Used by both the server handler and client highlight renderer.
+     */
+    static boolean canAreaHarvest(Level level, BlockPos target) {
+        BlockState state = level.getBlockState(target);
+        return state.getBlock() instanceof CropBlock crop && crop.isMaxAge(state);
     }
 
     /**

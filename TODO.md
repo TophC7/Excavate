@@ -11,6 +11,10 @@ blocks are destroyed directly via `level.destroyBlock()` — no permission check
 A player at the edge of a claimed area can mine into someone else's claim.
 The surrounding blocks get removed without asking the protection mod if it's allowed.
 
+Beyond protection, surrounding blocks generate **no events at all** — no XP orbs,
+no advancement triggers, no block break statistics, and no mod interop (other mods
+listening to `BreakEvent` see nothing for the surrounding blocks).
+
 ### The fix
 
 Replace raw `level.destroyBlock()` with `ServerPlayer.gameMode.destroyBlock(target)`
@@ -19,6 +23,7 @@ for each surrounding block. This goes through the full server-side pipeline:
 1. Fires `BlockEvent.BreakEvent` per block
 2. Protection mods can cancel individual blocks
 3. Only blocks that pass all checks get destroyed
+4. XP, stats, and advancements fire correctly
 
 ### Complications
 
@@ -30,13 +35,11 @@ for each surrounding block. This goes through the full server-side pipeline:
   need to avoid double-damaging the tool
 - Need to test that Fortune/Silk Touch still apply correctly through this path
 
-## Highlight Per-Block Accuracy
+## ~~Highlight Per-Block Accuracy~~ ✓
 
-The renderer draws one big rectangle for the entire radius. Blocks that are air,
-wrong material, or unbreakable still appear inside the highlight. Consider
-rendering per-block outlines for only the blocks that would actually break.
-More expensive but more accurate — or accept the tradeoff and treat it as an
-area indicator.
+Renderer now iterates each position and checks the same filters as the server-side
+mining logic (air, unbreakable, wrong tool, immature crops). Only blocks that would
+actually break get an outline.
 
 ## Tool Durability Scaling for Area Mining
 
@@ -46,11 +49,15 @@ a durability multiplier per enchantment level, or a flat extra cost per area swi
 Same applies to crop harvesting where vanilla doesn't consume durability at all
 for breaking crops.
 
-## SafeConfig.validateOrReset for COMMON Configs
+## ~~SafeConfig.validateOrReset for COMMON Configs~~ ✓
 
-`validateOrReset` hardcodes `-client.toml` for file cleanup. Excavate uses COMMON
-config (`-common.toml`), so the corrupted file rename is a no-op. Fix in KwahsCore:
-accept a `ModConfig.Type` parameter or derive the filename from the spec.
+Fixed in KwahsCore 0.3.0 — `validateOrReset` now accepts a `configType` string.
+Excavate passes `"common"` to target the correct `-common.toml` file.
+
+## Highlight Color Config
+
+The outline color is hardcoded white at 60% alpha. Since there's already a "General >
+Visual" config section, add a color/alpha option so players can customize the highlight.
 
 ## Ideas
 

@@ -13,8 +13,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import xyz.kwahson.core.config.SafeConfig;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -30,6 +30,7 @@ public class ExcavationHighlightRenderer {
         if (player == null || mc.level == null) return;
 
         if (player.isCrouching()) return;
+        if (!SafeConfig.getBool(ExcavateConfig.SHOW_HIGHLIGHT, true)) return;
 
         int enchantLevel = ExcavateMod.getExcavationLevel(player.level(), player);
         if (enchantLevel <= 0) return;
@@ -43,39 +44,47 @@ public class ExcavationHighlightRenderer {
 
         if (!isCrop && !tool.isCorrectToolForDrops(targetState)) return;
 
-        // crops expand horizontally (Y axis = flat XZ plane), mining uses the clicked face
         Direction.Axis axis = isCrop ? Direction.Axis.Y : face.getAxis();
-        AABB area = buildAreaBox(origin, axis, enchantLevel);
 
         Camera camera = event.getCamera();
         Vec3 cam = camera.getPosition();
-
         PoseStack poseStack = event.getPoseStack();
         VertexConsumer buffer = event.getMultiBufferSource().getBuffer(RenderType.lines());
 
         poseStack.pushPose();
-        LevelRenderer.renderLineBox(
-                poseStack, buffer,
-                area.minX - cam.x, area.minY - cam.y, area.minZ - cam.z,
-                area.maxX - cam.x, area.maxY - cam.y, area.maxZ - cam.z,
-                1.0F, 1.0F, 1.0F, 0.6F
-        );
-        poseStack.popPose();
 
+        // highlight the origin block
+        renderBlockOutline(poseStack, buffer, origin, cam);
+
+        // highlight each surrounding block that would actually be affected
+        for (int a = -enchantLevel; a <= enchantLevel; a++) {
+            for (int b = -enchantLevel; b <= enchantLevel; b++) {
+                if (a == 0 && b == 0) continue;
+
+                BlockPos target = isCrop
+                        ? origin.offset(a, 0, b)
+                        : ExcavationHandler.offsetFromFace(origin, axis, a, b);
+                if (isCrop) {
+                    if (!ExcavationHandler.canAreaHarvest(mc.level, target)) continue;
+                } else {
+                    if (!ExcavationHandler.canAreaBreak(mc.level, target, tool)) continue;
+                }
+
+                renderBlockOutline(poseStack, buffer, target, cam);
+            }
+        }
+
+        poseStack.popPose();
         event.setCanceled(true);
     }
 
-    /**
-     * Builds an AABB covering the full mining area
-     * 1 block deep along the face axis, (2*radius+1) wide on each perpendicular axis
-     */
-    private static AABB buildAreaBox(BlockPos origin, Direction.Axis faceAxis, int radius) {
-        int ox = origin.getX(), oy = origin.getY(), oz = origin.getZ();
-
-        return switch (faceAxis) {
-            case X -> new AABB(ox, oy - radius, oz - radius, ox + 1, oy + radius + 1, oz + radius + 1);
-            case Y -> new AABB(ox - radius, oy, oz - radius, ox + radius + 1, oy + 1, oz + radius + 1);
-            case Z -> new AABB(ox - radius, oy - radius, oz, ox + radius + 1, oy + radius + 1, oz + 1);
-        };
+    private static void renderBlockOutline(
+            PoseStack poseStack, VertexConsumer buffer, BlockPos pos, Vec3 cam) {
+        LevelRenderer.renderLineBox(
+                poseStack, buffer,
+                pos.getX() - cam.x, pos.getY() - cam.y, pos.getZ() - cam.z,
+                pos.getX() + 1 - cam.x, pos.getY() + 1 - cam.y, pos.getZ() + 1 - cam.z,
+                1.0F, 1.0F, 1.0F, 0.6F
+        );
     }
 }
