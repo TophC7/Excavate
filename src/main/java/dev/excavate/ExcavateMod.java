@@ -24,6 +24,7 @@ public class ExcavateMod {
             ResourceLocation.fromNamespaceAndPath(MOD_ID, "excavation");
 
     public ExcavateMod(IEventBus modEventBus, ModContainer modContainer) {
+        modContainer.registerConfig(ModConfig.Type.CLIENT, ExcavateClientConfig.SPEC);
         modContainer.registerConfig(ModConfig.Type.COMMON, ExcavateConfig.SPEC);
 
         if (FMLEnvironment.dist.isClient()) {

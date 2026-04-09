@@ -28,9 +28,13 @@ If no seed drops, that crop is left empty. You can toggle auto-replant in the co
 
 Open the config screen from the Mods menu. Settings:
 
-| Setting      | Default | Description                                      |
-| ------------ | ------- | ------------------------------------------------ |
-| Auto-Replant | On      | Replant crops automatically when area-harvesting |
+| Setting              | Scope  | Default | Description                                                  |
+| -------------------- | ------ | ------- | ------------------------------------------------------------ |
+| Show Highlight       | Client | On      | Show the area outline preview                                |
+| Auto-Replant         | Common | On      | Replant crops automatically when area-harvesting             |
+| Area Hoe Tilling     | Common | On      | Let hoes till dirtlike blocks in an area                     |
+| Area Shovel Pathing  | Common | On      | Let shovels create dirt paths in an area                     |
+| Area Axe Actions     | Common | On      | Let axes strip logs and apply other right-click axe actions in an area |
 
 ## Getting the enchantment
 

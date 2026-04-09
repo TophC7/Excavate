@@ -12,18 +12,23 @@ public final class ExcavateConfigScreen {
     private ExcavateConfigScreen() {}
 
     public static Screen create(Screen parent) {
-        return KwahsConfigScreen.builder("Excavate", parent, ExcavateConfig.SPEC)
-                .tab("General", ExcavateConfigScreen::buildGeneralTab)
-                .tab("Harvesting", ExcavateConfigScreen::buildHarvestingTab)
+        return KwahsConfigScreen.builder("Excavate", parent, ExcavateClientConfig.SPEC, ExcavateConfig.SPEC)
+                .tab("Settings", ExcavateConfigScreen::buildSettingsTab)
                 .build();
     }
 
-    private static void buildGeneralTab(ConfigTab tab) {
+    private static void buildSettingsTab(ConfigTab tab) {
         tab.section("Visual");
-        tab.left(tab.toggle("Show Highlight", ExcavateConfig.SHOW_HIGHLIGHT));
-    }
+        tab.left(tab.toggle("Show Highlight", ExcavateClientConfig.SHOW_HIGHLIGHT));
 
-    private static void buildHarvestingTab(ConfigTab tab) {
+        tab.nextRow();
+        tab.section("Special Tool Actions");
+        tab.left(tab.toggle("Area Hoe Tilling", ExcavateConfig.AREA_HOE_TILLING));
+        tab.right(tab.toggle("Area Shovel Pathing", ExcavateConfig.AREA_SHOVEL_PATHING));
+        tab.nextRow();
+        tab.left(tab.toggle("Area Axe Actions", ExcavateConfig.AREA_AXE_ACTIONS));
+
+        tab.nextRow();
         tab.section("Crops");
         tab.left(tab.toggle("Auto-Replant", ExcavateConfig.AUTO_REPLANT));
     }

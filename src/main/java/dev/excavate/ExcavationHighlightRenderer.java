@@ -31,7 +31,7 @@ public class ExcavationHighlightRenderer {
         if (player == null || mc.level == null) return;
 
         if (player.isCrouching()) return;
-        if (!SafeConfig.getBool(ExcavateConfig.SHOW_HIGHLIGHT, true)) return;
+        if (!SafeConfig.getBool(ExcavateClientConfig.SHOW_HIGHLIGHT, true)) return;
 
         ItemStack tool = player.getMainHandItem();
         int enchantLevel = ExcavateMod.getExcavationLevel(player.level(), tool);

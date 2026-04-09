@@ -56,7 +56,11 @@ public class ExcavationHandler {
         if (!configValidated && ExcavateConfig.SPEC.isLoaded()) {
             configValidated = true;
             SafeConfig.validateOrReset(ExcavateMod.MOD_ID, ExcavateConfig.SPEC,
-                    "common", ExcavateConfig.AUTO_REPLANT, ExcavateConfig.SHOW_HIGHLIGHT);
+                    "common",
+                    ExcavateConfig.AUTO_REPLANT,
+                    ExcavateConfig.AREA_HOE_TILLING,
+                    ExcavateConfig.AREA_SHOVEL_PATHING,
+                    ExcavateConfig.AREA_AXE_ACTIONS);
         }
     }
 
@@ -337,6 +341,7 @@ public class ExcavationHandler {
         BlockState state = level.getBlockState(target);
 
         if (context.getItemInHand().getItem() instanceof ShovelItem) {
+            if (!SafeConfig.getBool(ExcavateConfig.AREA_SHOVEL_PATHING, true)) return null;
             if (context.getClickedFace() == Direction.DOWN) return null;
 
             BlockState flattened = state.getToolModifiedState(
@@ -346,6 +351,7 @@ public class ExcavationHandler {
         }
 
         if (context.getItemInHand().getItem() instanceof HoeItem) {
+            if (!SafeConfig.getBool(ExcavateConfig.AREA_HOE_TILLING, true)) return null;
             BlockState tilled = state.getToolModifiedState(
                     context, net.neoforged.neoforge.common.ItemAbilities.HOE_TILL, simulate);
             return tilled != null
@@ -354,6 +360,7 @@ public class ExcavationHandler {
         }
 
         if (context.getItemInHand().getItem() instanceof AxeItem) {
+            if (!SafeConfig.getBool(ExcavateConfig.AREA_AXE_ACTIONS, true)) return null;
             if (playerHasShieldUseIntent(player, hand)) return null;
 
             BlockState stripped = state.getToolModifiedState(
