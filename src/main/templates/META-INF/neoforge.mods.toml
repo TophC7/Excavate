@@ -8,7 +8,8 @@ version = "${mod_version}"
 displayName = "${mod_name}"
 logoFile = "icon.png"
 description = '''
-Adds the Excavation enchantment: mine in a 3x3 (level I) or 5x5 (level II) area.
+Adds the Excavation enchantment: affect a 3x3 (level I) or 5x5 (level II) area.
+Works on mining, crop harvesting, hoe tilling, shovel pathing, and axe stripping.
 Works on all tools; pickaxes, axes, shovels, and hoes.
 Each block drops its own correct loot.
 '''

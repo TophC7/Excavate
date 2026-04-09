@@ -1,5 +1,5 @@
 {
   "enchantment.excavate.excavation": "Excavation",
-  "enchantment.excavate.excavation.desc.1": "Mine a 3x3 area. Crouch to mine single blocks. Excavation only affects blocks the tool can mine.",
-  "enchantment.excavate.excavation.desc.2": "Mine a 5x5 area. Crouch to mine single blocks. Excavation only affects blocks the tool can mine."
+  "enchantment.excavate.excavation.desc.1": "Affects a 3x3 area. Crouch for single blocks. Works on mining, crop harvesting, tilling, pathing, and stripping.",
+  "enchantment.excavate.excavation.desc.2": "Affects a 5x5 area. Crouch for single blocks. Works on mining, crop harvesting, tilling, pathing, and stripping."
 }

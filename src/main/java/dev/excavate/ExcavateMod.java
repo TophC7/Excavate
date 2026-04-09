@@ -3,6 +3,7 @@ package dev.excavate;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.level.Level;
 import net.neoforged.bus.api.IEventBus;
@@ -43,6 +44,14 @@ public class ExcavateMod {
                 .registry(Registries.ENCHANTMENT)
                 .flatMap(reg -> reg.getHolder(EXCAVATION_ID))
                 .map(holder -> EnchantmentHelper.getEnchantmentLevel(holder, player))
+                .orElse(0);
+    }
+
+    public static int getExcavationLevel(Level level, ItemStack stack) {
+        return level.registryAccess()
+                .registry(Registries.ENCHANTMENT)
+                .flatMap(reg -> reg.getHolder(EXCAVATION_ID))
+                .map(stack::getEnchantmentLevel)
                 .orElse(0);
     }
 }

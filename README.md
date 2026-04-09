@@ -4,14 +4,15 @@ Area mining enchantment for NeoForge 1.21.1.
 
 ![Mod preview, Excavation II](public/preview.webp)
 
-**Excavation I** mines a 3x3 area.
-**Excavation II** mines a 5x5 area.
-Crouch to mine single blocks.
+**Excavation I** affects a 3x3 area.
+**Excavation II** affects a 5x5 area.
+Crouch to use single-block interactions.
 
 ## How it works
 
 - Enchant any pickaxe, axe, shovel, or hoe
 - Mine a block and the surrounding area breaks as well
+- Hoe tilling, shovel pathing, and axe stripping also affect the surrounding area
 - Each block drops its own correct loot
 - Only blocks your tool can actually mine are affected
 - Tool takes durability per block broken and stops if it breaks

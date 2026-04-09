@@ -10,6 +10,7 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -32,19 +33,30 @@ public class ExcavationHighlightRenderer {
         if (player.isCrouching()) return;
         if (!SafeConfig.getBool(ExcavateConfig.SHOW_HIGHLIGHT, true)) return;
 
-        int enchantLevel = ExcavateMod.getExcavationLevel(player.level(), player);
+        ItemStack tool = player.getMainHandItem();
+        int enchantLevel = ExcavateMod.getExcavationLevel(player.level(), tool);
         if (enchantLevel <= 0) return;
 
         BlockPos origin = event.getTarget().getBlockPos();
         BlockState targetState = mc.level.getBlockState(origin);
-        ItemStack tool = player.getMainHandItem();
         Direction face = event.getTarget().getDirection();
+        Vec3 localHit = new Vec3(
+                event.getTarget().getLocation().x - origin.getX(),
+                event.getTarget().getLocation().y - origin.getY(),
+                event.getTarget().getLocation().z - origin.getZ()
+        );
 
         boolean isCrop = targetState.getBlock() instanceof CropBlock crop && crop.isMaxAge(targetState);
+        boolean isAreaUse = ExcavationHandler.canAreaUse(
+                mc.level, origin, player, InteractionHand.MAIN_HAND, tool, face, localHit, event.getTarget().isInside());
+        Direction.Axis areaUseAxis = isAreaUse
+                ? ExcavationHandler.getAreaUseAxis(
+                        mc.level, origin, player, InteractionHand.MAIN_HAND, tool, face, localHit, event.getTarget().isInside())
+                : null;
 
-        if (!isCrop && !tool.isCorrectToolForDrops(targetState)) return;
+        if (!isCrop && !isAreaUse && !tool.isCorrectToolForDrops(targetState)) return;
 
-        Direction.Axis axis = isCrop ? Direction.Axis.Y : face.getAxis();
+        Direction.Axis axis = isCrop ? Direction.Axis.Y : (isAreaUse ? areaUseAxis : face.getAxis());
 
         Camera camera = event.getCamera();
         Vec3 cam = camera.getPosition();
@@ -66,6 +78,11 @@ public class ExcavationHighlightRenderer {
                         : ExcavationHandler.offsetFromFace(origin, axis, a, b);
                 if (isCrop) {
                     if (!ExcavationHandler.canAreaHarvest(mc.level, target)) continue;
+                } else if (isAreaUse) {
+                    if (!ExcavationHandler.canAreaUse(
+                            mc.level, target, player, InteractionHand.MAIN_HAND, tool, face, localHit, event.getTarget().isInside())) {
+                        continue;
+                    }
                 } else {
                     if (!ExcavationHandler.canAreaBreak(mc.level, target, tool)) continue;
                 }

@@ -10,17 +10,30 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.AxeItem;
+import net.minecraft.world.item.HoeItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ShovelItem;
+import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.neoforge.event.entity.player.UseItemOnBlockEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -28,11 +41,13 @@ import xyz.kwahson.core.config.SafeConfig;
 
 @EventBusSubscriber(modid = ExcavateMod.MOD_ID)
 public class ExcavationHandler {
+    private record AreaUseData(BlockState modifiedState, Direction.Axis axis, Integer levelEvent) {}
 
     // Both maps are only accessed from the server main thread
     // (LeftClickBlock, BreakEvent, ServerTick, PlayerLoggedOut all fire there).
     private static final HashMap<UUID, Direction> clickedFace = new HashMap<>();
     private static final Set<UUID> excavatingPlayers = new HashSet<>();
+    private static final ThreadLocal<Integer> useOnReentryDepth = ThreadLocal.withInitial(() -> 0);
 
     private static boolean configValidated = false;
 
@@ -71,6 +86,38 @@ public class ExcavationHandler {
     }
 
     @SubscribeEvent
+    public static void onUseItemOnBlock(UseItemOnBlockEvent event) {
+        if (event.getUsePhase() != UseItemOnBlockEvent.UsePhase.ITEM_AFTER_BLOCK) return;
+        if (useOnReentryDepth.get() > 0) return;
+
+        Player player = event.getPlayer();
+        if (player == null || player.isCrouching()) return;
+
+        Level level = event.getLevel();
+        ItemStack tool = event.getItemStack();
+        int enchantLevel = ExcavateMod.getExcavationLevel(level, tool);
+        if (enchantLevel <= 0) return;
+
+        Direction face = event.getFace();
+        if (face == null) return;
+
+        BlockPos origin = event.getPos();
+        Vec3 localHit = getLocalHit(event.getUseOnContext().getClickLocation(), origin);
+        AreaUseData originUse = getAreaUse(level, origin, player, event.getHand(), tool, face, localHit,
+                event.getUseOnContext().isInside(), true);
+        if (originUse == null) return;
+
+        InteractionResult originResult = runVanillaUseOn(tool, event.getUseOnContext());
+        event.cancelWithResult(toItemInteractionResult(originResult));
+
+        if (!originResult.consumesAction()) return;
+        if (!(level instanceof ServerLevel serverLevel) || tool.isEmpty()) return;
+
+        applyAreaUse(serverLevel, player, event.getHand(), tool, origin, face, localHit,
+                event.getUseOnContext().isInside(), enchantLevel, originUse.axis());
+    }
+
+    @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
         Player player = event.getPlayer();
         UUID playerId = player.getUUID();
@@ -82,7 +129,7 @@ public class ExcavationHandler {
         if (!(level instanceof ServerLevel serverLevel)) return;
 
         ItemStack tool = player.getMainHandItem();
-        int enchantLevel = ExcavateMod.getExcavationLevel(level, player);
+        int enchantLevel = ExcavateMod.getExcavationLevel(level, tool);
         if (enchantLevel <= 0) return;
 
         Direction face = clickedFace.get(playerId);
@@ -140,6 +187,39 @@ public class ExcavationHandler {
                 if (tool.isEmpty()) return;
             }
         }
+    }
+
+    private static void applyAreaUse(
+            ServerLevel level, Player player, InteractionHand hand, ItemStack tool,
+            BlockPos origin, Direction face, Vec3 localHit, boolean inside,
+            int enchantLevel, Direction.Axis axis) {
+
+        for (int a = -enchantLevel; a <= enchantLevel; a++) {
+            for (int b = -enchantLevel; b <= enchantLevel; b++) {
+                if (a == 0 && b == 0) continue;
+
+                BlockPos target = offsetFromFace(origin, axis, a, b);
+                if (!applyAreaUseAt(level, player, hand, tool, target, face, localHit, inside)) continue;
+
+                tool.hurtAndBreak(1, player, LivingEntity.getSlotForHand(hand));
+                if (tool.isEmpty()) return;
+            }
+        }
+    }
+
+    private static boolean applyAreaUseAt(
+            ServerLevel level, Player player, InteractionHand hand, ItemStack tool,
+            BlockPos target, Direction face, Vec3 localHit, boolean inside) {
+
+        AreaUseData areaUse = getAreaUse(level, target, player, hand, tool, face, localHit, inside, false);
+        if (areaUse == null) return false;
+
+        level.setBlock(target, areaUse.modifiedState(), 11);
+        level.gameEvent(GameEvent.BLOCK_CHANGE, target, GameEvent.Context.of(player, areaUse.modifiedState()));
+        if (areaUse.levelEvent() != null) {
+            level.levelEvent(player, areaUse.levelEvent(), target, 0);
+        }
+        return true;
     }
 
     /**
@@ -222,6 +302,21 @@ public class ExcavationHandler {
         return state.getBlock() instanceof CropBlock crop && crop.isMaxAge(state);
     }
 
+    static boolean canAreaUse(
+            Level level, BlockPos target, Player player, InteractionHand hand, ItemStack tool,
+            Direction face, Vec3 localHit, boolean inside) {
+
+        return getAreaUse(level, target, player, hand, tool, face, localHit, inside, true) != null;
+    }
+
+    static Direction.Axis getAreaUseAxis(
+            Level level, BlockPos target, Player player, InteractionHand hand, ItemStack tool,
+            Direction face, Vec3 localHit, boolean inside) {
+
+        AreaUseData areaUse = getAreaUse(level, target, player, hand, tool, face, localHit, inside, true);
+        return areaUse != null ? areaUse.axis() : null;
+    }
+
     /**
      * Offsets a position along the two axes perpendicular to the mined face.
      * If looking at a NORTH/SOUTH face, expands along X and Y.
@@ -232,5 +327,100 @@ public class ExcavationHandler {
             case Y -> origin.offset(a, 0, b);
             case Z -> origin.offset(a, b, 0);
         };
+    }
+
+    private static AreaUseData getAreaUse(
+            Level level, BlockPos target, Player player, InteractionHand hand, ItemStack tool,
+            Direction face, Vec3 localHit, boolean inside, boolean simulate) {
+
+        UseOnContext context = createAreaUseContext(level, player, hand, tool, target, face, localHit, inside);
+        BlockState state = level.getBlockState(target);
+
+        if (context.getItemInHand().getItem() instanceof ShovelItem) {
+            if (context.getClickedFace() == Direction.DOWN) return null;
+
+            BlockState flattened = state.getToolModifiedState(
+                    context, net.neoforged.neoforge.common.ItemAbilities.SHOVEL_FLATTEN, simulate);
+            if (flattened == null || !level.getBlockState(target.above()).isAir()) return null;
+            return new AreaUseData(flattened, Direction.Axis.Y, null);
+        }
+
+        if (context.getItemInHand().getItem() instanceof HoeItem) {
+            BlockState tilled = state.getToolModifiedState(
+                    context, net.neoforged.neoforge.common.ItemAbilities.HOE_TILL, simulate);
+            return tilled != null
+                    ? new AreaUseData(tilled, Direction.Axis.Y, null)
+                    : null;
+        }
+
+        if (context.getItemInHand().getItem() instanceof AxeItem) {
+            if (playerHasShieldUseIntent(player, hand)) return null;
+
+            BlockState stripped = state.getToolModifiedState(
+                    context, net.neoforged.neoforge.common.ItemAbilities.AXE_STRIP, simulate);
+            if (stripped != null) {
+                return new AreaUseData(stripped, face.getAxis(), null);
+            }
+
+            BlockState scraped = state.getToolModifiedState(
+                    context, net.neoforged.neoforge.common.ItemAbilities.AXE_SCRAPE, simulate);
+            if (scraped != null) {
+                return new AreaUseData(scraped, face.getAxis(), 3005);
+            }
+
+            BlockState waxOff = state.getToolModifiedState(
+                    context, net.neoforged.neoforge.common.ItemAbilities.AXE_WAX_OFF, simulate);
+            if (waxOff != null) {
+                return new AreaUseData(waxOff, face.getAxis(), 3004);
+            }
+        }
+
+        return null;
+    }
+
+    private static InteractionResult runVanillaUseOn(ItemStack tool, UseOnContext context) {
+        useOnReentryDepth.set(useOnReentryDepth.get() + 1);
+        try {
+            return tool.useOn(context);
+        } finally {
+            useOnReentryDepth.set(useOnReentryDepth.get() - 1);
+        }
+    }
+
+    private static ItemInteractionResult toItemInteractionResult(InteractionResult result) {
+        return switch (result) {
+            case SUCCESS, SUCCESS_NO_ITEM_USED -> ItemInteractionResult.SUCCESS;
+            case CONSUME -> ItemInteractionResult.CONSUME;
+            case CONSUME_PARTIAL -> ItemInteractionResult.CONSUME_PARTIAL;
+            case PASS -> ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+            case FAIL -> ItemInteractionResult.FAIL;
+        };
+    }
+
+    private static boolean playerHasShieldUseIntent(Player player, InteractionHand hand) {
+        return hand == InteractionHand.MAIN_HAND
+                && player.getOffhandItem().is(Items.SHIELD)
+                && !player.isSecondaryUseActive();
+    }
+
+    private static UseOnContext createAreaUseContext(
+            Level level, Player player, InteractionHand hand, ItemStack tool,
+            BlockPos target, Direction face, Vec3 localHit, boolean inside) {
+
+        Vec3 clickLocation = new Vec3(
+                target.getX() + localHit.x,
+                target.getY() + localHit.y,
+                target.getZ() + localHit.z
+        );
+        BlockHitResult hit = new BlockHitResult(clickLocation, face, target, inside);
+        return new UseOnContext(level, player, hand, tool, hit);
+    }
+
+    private static Vec3 getLocalHit(Vec3 hitLocation, BlockPos origin) {
+        return new Vec3(
+                hitLocation.x - origin.getX(),
+                hitLocation.y - origin.getY(),
+                hitLocation.z - origin.getZ()
+        );
     }
 }
